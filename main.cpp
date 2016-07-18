@@ -84,9 +84,9 @@ void parseCommand(std::string command) {
 
 void setIndicatorByName(std::string name) {
   bool found = true;
-  if (name.compare("one") == 0) {
+  if (name.compare("69732482") == 0) {
     setIndicator(0);
-  } else if (name.compare("two") == 0) {
+  } else if (name.compare("478210625") == 0) {
     setIndicator(1);
   } else {
     setIndicator(-1);
