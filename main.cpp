@@ -12,7 +12,7 @@
 #include <sstream>
 #include <vector>
 
-#include "neopixel.h"
+#include "neopixel/neopixel.h"
 #include "application.h"
 
 // IMPORTANT: Set pixel COUNT, PIN and TYPE
