@@ -68,7 +68,7 @@ void readEEPROM(void);
 void writeEEPROM(void);
 int call_addDisplay(String input);
 int call_removeDisplay(String input);
-// bool listDisplays();
+bool listDisplays();
 bool addDisplay(std::vector<std::string> parsed);
 bool removeDisplay(std::vector<std::string> parsed);
 
@@ -90,9 +90,7 @@ void setup() {
   loadDisplays();
 }
 
-void loop() {
-  // setIndicator(1);
-}
+void loop() { }
 
 void serialEvent() {
   char c = Serial.read();
@@ -125,8 +123,8 @@ void parseCommand(std::string input) {
 
   if (command.compare("set") == 0) {
     setIndicatorByName(parsed.at(0));
-  // } else if (command.compare("list") == 0) {
-  //   listDisplays();
+  } else if (command.compare("list") == 0) {
+    listDisplays();
   } else if (command.compare("add") == 0) {
     addDisplay(parsed);
   } else if (command.compare("remove") == 0) {
@@ -136,19 +134,19 @@ void parseCommand(std::string input) {
   }
 }
 
-// bool listDisplays() {
-//   Serial.println("OK");
+bool listDisplays() {
+  Serial.println("OK");
 
-//   for (
-//     auto display = monitorMap.begin();
-//     display != monitorMap.end();
-//     display++
-//   ) {
-//     Serial.printlnf("DISPLAY: %s (%i)", display->first, display->second);
-//   }
+  for (
+    auto display = monitorMap.begin();
+    display != monitorMap.end();
+    display++
+  ) {
+    Serial.printlnf("DISPLAY: %s (%i)", display->first.c_str(), display->second);
+  }
 
-//   return true;
-// }
+  return true;
+}
 
 bool addDisplay(std::vector<std::string> parsed) {
   if (parsed.size() < 2) {
