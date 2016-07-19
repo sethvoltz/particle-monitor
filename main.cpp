@@ -16,6 +16,7 @@
 #include "neopixel/neopixel.h"
 #include "application.h"
 
+
 // =--------------------------------------------------------------= Defines =--=
 #define PIXEL_COUNT 10
 #define PIXEL_PIN D2
@@ -28,14 +29,21 @@
 #define DISPLAY_COUNT 20         // Number of displays that can be stored
 #define COMMAND_BUFFER_SIZE 128  // How long can an incoming command string be
 #define INDICATOR_COLOR 55       // Color as angle [0 <= n < 360]
-#define INDICATOR_BRIGHTNESS 64  // Color brightness [0 <= n < 256]
+#define INDICATOR_BRIGHTNESS 64  // Global indicator brightness [0 <= n < 256]
+
+// LED Fading
+#define FADE_DURATION_MSEC 1000
+#define FADE_UPDATE_INTERVAL_MSEC 50
 
 
 // =--------------------------------------------------------------= Globals =--=
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
+float indicatorBrightness[PIXEL_COUNT];
+int currentIndicator;
 int serialCounter = 0;
 std::stringstream serialBuffer;
 std::map<std::string, int> monitorMap;
+
 
 // =-------------------------------------------------= EEPROM Configuration =--=
 struct displayConfig {
@@ -53,8 +61,10 @@ union {
     char eeArray[sizeof(displayEEPROM)];
 } EEPROMData;
 
+
 // =--------------------------------------------------= Function Prototypes =--=
-uint32_t Wheel(byte WheelPos);
+uint32_t Wheel(byte WheelPos, float brightness);
+byte scale(byte value, float percent);
 void setIndicatorByName(std::string name);
 void setIndicator(int indicator);
 void parseCommand(std::string command);
@@ -71,6 +81,7 @@ int call_removeDisplay(String input);
 bool listDisplays();
 bool addDisplay(std::vector<std::string> parsed);
 bool removeDisplay(std::vector<std::string> parsed);
+void updateLEDs(unsigned long time_diff);
 
 
 // =-------------------------------------------------------= Core Functions =--=
@@ -90,7 +101,36 @@ void setup() {
   loadDisplays();
 }
 
-void loop() { }
+void loop() {
+  static unsigned long fade_update_timer = millis();
+
+  unsigned long fade_update_time_diff = millis() - fade_update_timer;
+  if (fade_update_time_diff > FADE_UPDATE_INTERVAL_MSEC) {
+    updateLEDs(fade_update_time_diff);
+    fade_update_timer = millis();
+  }
+}
+
+void updateLEDs(unsigned long time_diff) {
+  // current indicator fades to full, all others fade out
+  float percent = (float)time_diff / (float)FADE_DURATION_MSEC;
+
+  for (int i = 0; i < PIXEL_COUNT; ++i) {
+    if (i == currentIndicator && indicatorBrightness[i] < 1) {
+      // fade up
+      indicatorBrightness[i] += percent;
+      if (indicatorBrightness[i] > 1) indicatorBrightness[i] = 1;
+    } else if (i != currentIndicator && indicatorBrightness[i] > 0) {
+      // fade down
+      indicatorBrightness[i] -= percent;
+      if (indicatorBrightness[i] < 0) indicatorBrightness[i] = 0;
+    }
+    strip.setPixelColor(i, Wheel(INDICATOR_COLOR, indicatorBrightness[i]));
+  }
+
+  strip.setBrightness(INDICATOR_BRIGHTNESS);
+  strip.show();
+}
 
 void serialEvent() {
   char c = Serial.read();
@@ -187,16 +227,7 @@ void setIndicatorByName(std::string name) {
 }
 
 void setIndicator(int indicator) {
-  for (int i = 0; i < PIXEL_COUNT; ++i) {
-    if (i == indicator) {
-      strip.setPixelColor(i, Wheel(INDICATOR_COLOR));
-    } else {
-      strip.setPixelColor(i, strip.Color(0, 0, 0));
-    }
-  }
-
-  strip.setBrightness(INDICATOR_BRIGHTNESS);
-  strip.show();
+  currentIndicator = indicator;
 }
 
 
@@ -233,19 +264,39 @@ std::vector<std::string> split(const std::string &s, char delim) {
 }
 
 // Input a value 0 to 255 to get a color value.
+// Brightness percent between 0 and 1
 // The colours are a transition r - g - b - back to r.
-uint32_t Wheel(byte WheelPos) {
+uint32_t Wheel(byte WheelPos, float brightness) {
+  if (brightness == 0) {
+    return strip.Color(0, 0, 0);
+  }
+
   if (WheelPos < 85) {
-    return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+    return strip.Color(
+      scale(WheelPos * 3, brightness),
+      scale(255 - WheelPos * 3, brightness),
+      scale(0, brightness)
+    );
   } else if (WheelPos < 170) {
     WheelPos -= 85;
-    return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+    return strip.Color(
+      scale(255 - WheelPos * 3, brightness),
+      scale(0, brightness),
+      scale(WheelPos * 3, brightness)
+    );
   } else {
     WheelPos -= 170;
-    return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+    return strip.Color(
+      scale(0, brightness),
+      scale(WheelPos * 3, brightness),
+      scale(255 - WheelPos * 3, brightness)
+    );
   }
 }
 
+byte scale(byte value, float percent) {
+  return map(value, 0, 255, 0, (int)percent * 255);
+}
 
 // =--------------------------------------------= Config / EEPROM Functions =--=
 void loadDisplays() {
