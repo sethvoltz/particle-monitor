@@ -32,8 +32,8 @@
 #define INDICATOR_BRIGHTNESS 64  // Global indicator brightness [0 <= n < 256]
 
 // LED Fading
-#define FADE_DURATION_MSEC 1000
-#define FADE_UPDATE_INTERVAL_MSEC 50
+#define FADE_DURATION_MSEC 250
+#define FADE_UPDATE_INTERVAL_MSEC 33 // ~30fps
 
 
 // =--------------------------------------------------------------= Globals =--=
@@ -114,22 +114,27 @@ void loop() {
 void updateLEDs(unsigned long time_diff) {
   // current indicator fades to full, all others fade out
   float percent = (float)time_diff / (float)FADE_DURATION_MSEC;
+  bool needToWrite = false;
 
   for (int i = 0; i < PIXEL_COUNT; ++i) {
     if (i == currentIndicator && indicatorBrightness[i] < 1) {
       // fade up
       indicatorBrightness[i] += percent;
       if (indicatorBrightness[i] > 1) indicatorBrightness[i] = 1;
+      needToWrite = true;
     } else if (i != currentIndicator && indicatorBrightness[i] > 0) {
       // fade down
       indicatorBrightness[i] -= percent;
       if (indicatorBrightness[i] < 0) indicatorBrightness[i] = 0;
+      needToWrite = true;
     }
     strip.setPixelColor(i, Wheel(INDICATOR_COLOR, indicatorBrightness[i]));
   }
 
-  strip.setBrightness(INDICATOR_BRIGHTNESS);
-  strip.show();
+  if (needToWrite) {
+    strip.setBrightness(INDICATOR_BRIGHTNESS);
+    strip.show();
+  }
 }
 
 void serialEvent() {
@@ -295,7 +300,7 @@ uint32_t Wheel(byte WheelPos, float brightness) {
 }
 
 byte scale(byte value, float percent) {
-  return map(value, 0, 255, 0, (int)percent * 255);
+  return map(value, 0, 255, 0, (int)(percent * 255));
 }
 
 // =--------------------------------------------= Config / EEPROM Functions =--=
