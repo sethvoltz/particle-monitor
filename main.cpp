@@ -91,7 +91,7 @@ void setup() {
 
   // Setup Particle cloud functions
   Particle.function("addDisplay", call_addDisplay);
-  Particle.function("addDisplay", call_removeDisplay);
+  Particle.function("removeDisplay", call_removeDisplay);
 
   // Start NeoPixel Set
   strip.begin();
