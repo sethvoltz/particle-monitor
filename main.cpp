@@ -29,7 +29,7 @@
 #define DISPLAY_COUNT 20         // Number of displays that can be stored
 #define COMMAND_BUFFER_SIZE 128  // How long can an incoming command string be
 #define INDICATOR_COLOR 55       // Color as angle [0 <= n < 360]
-#define INDICATOR_BRIGHTNESS 64  // Global indicator brightness [0 <= n < 256]
+#define INDICATOR_BRIGHTNESS 128 // Global indicator brightness [0 <= n < 256]
 
 // LED Fading
 #define FADE_DURATION_MSEC 250
@@ -54,6 +54,7 @@ struct displayConfig {
 struct displayEEPROM {
   size_t count;
   displayConfig displays[DISPLAY_COUNT];
+  byte brightness;
 };
 
 union {
@@ -91,7 +92,7 @@ void setup() {
 
   // Setup Particle cloud functions
   Particle.function("addDisplay", call_addDisplay);
-  Particle.function("addDisplay", call_removeDisplay);
+  Particle.function("removeDisplay", call_removeDisplay);
 
   // Start NeoPixel Set
   strip.begin();
