@@ -1,6 +1,6 @@
 /*
 * ==============================================================================
-* The Monitor Monitor - Show which monitor is currently active while fullscreen
+* The Monitor Monitor - Show which screen is currently active while fullscreen
 *
 * Author: Seth Voltz
 * Created: 14-July-2016
@@ -26,7 +26,7 @@
 // note: RGB order is automatically applied to WS2811,
 //       WS2812/WS2812B/WS2812B2/TM1803 is GRB order.
 
-#define DISPLAY_COUNT 20         // Number of displays that can be stored
+#define SCREEN_COUNT 20          // Number of screens that can be stored
 #define COMMAND_BUFFER_SIZE 128  // How long can an incoming command string be
 #define INDICATOR_COLOR 55       // Color as angle [0 <= n < 360]
 #define INDICATOR_BRIGHTNESS 128 // Global indicator brightness [0 <= n < 256]
@@ -42,24 +42,24 @@ float indicatorBrightness[PIXEL_COUNT];
 int currentIndicator;
 int serialCounter = 0;
 std::stringstream serialBuffer;
-std::map<std::string, int> monitorMap;
+std::map<std::string, int> screenMap;
 
 
 // =-------------------------------------------------= EEPROM Configuration =--=
-struct displayConfig {
+struct screenConfig {
   uint32_t id;
   unsigned short int indicator;
 };
 
-struct displayEEPROM {
+struct screenEEPROM {
   size_t count;
-  displayConfig displays[DISPLAY_COUNT];
+  screenConfig screens[SCREEN_COUNT];
   byte brightness;
 };
 
 union {
-    displayEEPROM eevar;
-    char eeArray[sizeof(displayEEPROM)];
+    screenEEPROM eevar;
+    char eeArray[sizeof(screenEEPROM)];
 } EEPROMData;
 
 
@@ -73,15 +73,15 @@ std::vector<std::string> &split(const std::string &s, char delim, std::vector<st
 std::vector<std::string> split(const std::string &s, char delim);
 std::string uintToString(uint32_t number);
 uint32_t stringToUint(std::string value);
-void loadDisplays();
-void updateDisplays();
+void loadScreens();
+void updateScreens();
 void readEEPROM(void);
 void writeEEPROM(void);
-int call_addDisplay(String input);
-int call_removeDisplay(String input);
-bool listDisplays();
-bool addDisplay(std::vector<std::string> parsed);
-bool removeDisplay(std::vector<std::string> parsed);
+int call_addScreen(String input);
+int call_removeScreen(String input);
+bool listScreens();
+bool addScreen(std::vector<std::string> parsed);
+bool removeScreen(std::vector<std::string> parsed);
 void updateLEDs(unsigned long time_diff);
 
 
@@ -91,24 +91,24 @@ void setup() {
   Serial.begin(9600);
 
   // Setup Particle cloud functions
-  Particle.function("addDisplay", call_addDisplay);
-  Particle.function("removeDisplay", call_removeDisplay);
+  Particle.function("addScreen", call_addScreen);
+  Particle.function("removeScreen", call_removeScreen);
 
   // Start NeoPixel Set
   strip.begin();
   setIndicator(-1); // Initialize all pixels to 'off'
 
-  // Load monitors
-  loadDisplays();
+  // Load screens
+  loadScreens();
 }
 
 void loop() {
-  static unsigned long fade_update_timer = millis();
+  static unsigned long fadeUpdateTimer = millis();
 
-  unsigned long fade_update_time_diff = millis() - fade_update_timer;
-  if (fade_update_time_diff > FADE_UPDATE_INTERVAL_MSEC) {
-    updateLEDs(fade_update_time_diff);
-    fade_update_timer = millis();
+  unsigned long fadeUpdateTimeDiff = millis() - fadeUpdateTimer;
+  if (fadeUpdateTimeDiff > FADE_UPDATE_INTERVAL_MSEC) {
+    updateLEDs(fadeUpdateTimeDiff);
+    fadeUpdateTimer = millis();
   }
 }
 
@@ -170,62 +170,62 @@ void parseCommand(std::string input) {
   if (command.compare("set") == 0) {
     setIndicatorByName(parsed.at(0));
   } else if (command.compare("list") == 0) {
-    listDisplays();
+    listScreens();
   } else if (command.compare("add") == 0) {
-    addDisplay(parsed);
+    addScreen(parsed);
   } else if (command.compare("remove") == 0) {
-    removeDisplay(parsed);
+    removeScreen(parsed);
   } else {
     Serial.println("ERROR: Unknown command");
   }
 }
 
-bool listDisplays() {
+bool listScreens() {
   Serial.println("OK");
 
   for (
-    auto display = monitorMap.begin();
-    display != monitorMap.end();
-    display++
+    auto screen = screenMap.begin();
+    screen != screenMap.end();
+    screen++
   ) {
-    Serial.printlnf("DISPLAY: %s (%i)", display->first.c_str(), display->second);
+    Serial.printlnf("SCREEN: %s (%i)", screen->first.c_str(), screen->second);
   }
 
   return true;
 }
 
-bool addDisplay(std::vector<std::string> parsed) {
+bool addScreen(std::vector<std::string> parsed) {
   if (parsed.size() < 2) {
     Serial.println("ERROR: Insufficient parameters");
     return false;
   }
 
-  monitorMap[parsed.at(0)] = (int)stringToUint(parsed.at(1)); // update map
-  updateDisplays();
+  screenMap[parsed.at(0)] = (int)stringToUint(parsed.at(1)); // update map
+  updateScreens();
 
   Serial.println("OK");
   return true;
 }
 
-bool removeDisplay(std::vector<std::string> parsed) {
+bool removeScreen(std::vector<std::string> parsed) {
   if (parsed.size() < 1) {
     Serial.println("ERROR: Insufficient parameters");
     return false;
   }
 
-  monitorMap.erase(parsed.at(0)); // update map
-  updateDisplays();
+  screenMap.erase(parsed.at(0)); // update map
+  updateScreens();
 
   Serial.println("OK");
   return true;
 }
 
 void setIndicatorByName(std::string name) {
-  auto search = monitorMap.find(name);
+  auto search = screenMap.find(name);
 
-  if (search == monitorMap.end()) {
+  if (search == screenMap.end()) {
     setIndicator(-1);
-    Serial.println("ERROR: Unknown monitor");
+    Serial.println("ERROR: Unknown screen");
   } else {
     setIndicator(search->second);
     Serial.println("OK");
@@ -305,68 +305,68 @@ byte scale(byte value, float percent) {
 }
 
 // =--------------------------------------------= Config / EEPROM Functions =--=
-void loadDisplays() {
+void loadScreens() {
   readEEPROM();
 
-  if (EEPROMData.eevar.count > DISPLAY_COUNT)
-    EEPROMData.eevar.count = DISPLAY_COUNT;
+  if (EEPROMData.eevar.count > SCREEN_COUNT)
+    EEPROMData.eevar.count = SCREEN_COUNT;
 
   for (unsigned int i = 0; i < EEPROMData.eevar.count; i++) {
-    displayConfig display = EEPROMData.eevar.displays[i];
+    screenConfig screen = EEPROMData.eevar.screens[i];
 
     // Only load valid data
-    if (display.id > 0 && display.indicator < PIXEL_COUNT) {
-      Serial.printlnf("DISPLAY: %i (%i)", display.id, display.indicator);
-      monitorMap.insert(std::make_pair(uintToString(display.id), display.indicator));
+    if (screen.id > 0 && screen.indicator < PIXEL_COUNT) {
+      Serial.printlnf("screen: %i (%i)", screen.id, screen.indicator);
+      screenMap.insert(std::make_pair(uintToString(screen.id), screen.indicator));
     }
   }
 
-  if (monitorMap.size() != EEPROMData.eevar.count) {
-    Serial.println("ERROR: Display count and data do not match, rewriting");
-    updateDisplays();
+  if (screenMap.size() != EEPROMData.eevar.count) {
+    Serial.println("ERROR: screen count and data do not match, rewriting");
+    updateScreens();
   }
 }
 
-void updateDisplays() {
-  // Iterate monitorMap into eeprom struct
+void updateScreens() {
+  // Iterate screenMap into eeprom struct
   int index = 0;
   for (
-    auto display = monitorMap.begin();
-    display != monitorMap.end();
-    display++, index++
+    auto screen = screenMap.begin();
+    screen != screenMap.end();
+    screen++, index++
   ) {
-    EEPROMData.eevar.displays[index].id = stringToUint(display->first);
-    EEPROMData.eevar.displays[index].indicator = display->second;
+    EEPROMData.eevar.screens[index].id = stringToUint(screen->first);
+    EEPROMData.eevar.screens[index].indicator = screen->second;
   }
-  EEPROMData.eevar.count = monitorMap.size() > DISPLAY_COUNT ? DISPLAY_COUNT : monitorMap.size();
+  EEPROMData.eevar.count = screenMap.size() > SCREEN_COUNT ? SCREEN_COUNT : screenMap.size();
 
   writeEEPROM();
 }
 
 void readEEPROM(void) {
-  for (int i = 0; i < sizeof(displayEEPROM); i++) {
+  for (int i = 0; i < sizeof(screenEEPROM); i++) {
     EEPROMData.eeArray[i] = EEPROM.read(i);
   }
 }
 
 void writeEEPROM(void) {
-  for (int i = 0; i < sizeof(displayEEPROM); i++) {
+  for (int i = 0; i < sizeof(screenEEPROM); i++) {
     EEPROM.write(i, EEPROMData.eeArray[i]);
   }
 }
 
 
 // =---------------------------------------------= Particle Cloud Functions =--=
-int call_addDisplay(String input) {
-  // input => displayId, indicator
+int call_addScreen(String input) {
+  // input => screenId, indicator
   std::string command = input.c_str();
   std::vector<std::string> parsed = split(command, ' ');
-  return addDisplay(parsed) ? 0 : -1;
+  return addScreen(parsed) ? 0 : -1;
 }
 
-int call_removeDisplay(String input) {
-  // input => displayId
+int call_removeScreen(String input) {
+  // input => screenId
   std::string command = input.c_str();
   std::vector<std::string> parsed = split(command, ' ');
-  return removeDisplay(parsed) ? 0 : -1;
+  return removeScreen(parsed) ? 0 : -1;
 }
