@@ -54,6 +54,7 @@ struct displayConfig {
 struct displayEEPROM {
   size_t count;
   displayConfig displays[DISPLAY_COUNT];
+  byte brightness;
 };
 
 union {
